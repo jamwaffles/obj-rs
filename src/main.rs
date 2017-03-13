@@ -22,6 +22,7 @@ struct WavefrontObject {
 	name: String,
 	vertices: Vec<Vector3<f32>>,
 	normals: Vec<Vector3<f32>>,
+	texcoords: Option<Vec<Vector3<f32>>>,
 	material: Option<String>,
 	smoothing: Option<bool>,
 	faces: Vec<Face>,
@@ -85,6 +86,20 @@ named!(parse_vector3<&[u8], Vector3<f32>>,
 
 named!(vertex <&[u8], Vector3<f32>>, do_parse!(tag!("v") >> space >> vector: parse_vector3 >> (vector)));
 named!(normal <&[u8], Vector3<f32>>, do_parse!(tag!("vn") >> space >> vector: parse_vector3 >> (vector)));
+named!(texcoord<&[u8], Vector3<f32>>,
+	do_parse!(
+		tag!("vt") >>
+		space >>
+		u: parse_float >>
+		space >>
+		v: parse_float >>
+		opt!(space) >>
+		w: opt!(parse_float) >>
+		({
+			Vector3::new(u, v, w.unwrap_or(0.0))
+		})
+	)
+);
 named!(face <&[u8], Face>,
 	do_parse!(
 		tag!("f") >>
@@ -104,8 +119,9 @@ named!(face <&[u8], Face>,
 	)
 );
 
-named!(vertices_aggregator<&[u8], Vec<Vector3<f32>>>, many0!(vertex));
-named!(normals_aggregator<&[u8], Vec<Vector3<f32>>>, many0!(normal));
+named!(vertices_aggregator<&[u8], Vec<Vector3<f32>>>, many1!(vertex));
+named!(normals_aggregator<&[u8], Vec<Vector3<f32>>>, many1!(normal));
+named!(texcoords_aggregator<&[u8], Vec<Vector3<f32>>>, many1!(texcoord));
 named!(faces_aggregator<&[u8], Vec<Face>>, many0!(face));
 
 named!(comment, preceded!(tag!("#"), take_until_and_consume!("\n")));
@@ -158,6 +174,7 @@ named!(vertex_group<&[u8], WavefrontObject>,
 		name: object_start >>
 		vertices: vertices_aggregator >>
 		normals: normals_aggregator >>
+		textcoords: opt!(texcoords_aggregator) >>
 		material: opt!(usemtl) >>
 		smoothing: opt!(smoothing) >>
 		faces: faces_aggregator >>
@@ -166,6 +183,7 @@ named!(vertex_group<&[u8], WavefrontObject>,
 				name: name,
 				vertices: vertices,
 				normals: normals,
+				texcoords: textcoords,
 				material: material,
 				smoothing: smoothing,
 				faces: faces,
