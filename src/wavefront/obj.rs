@@ -57,10 +57,7 @@ named!(parse_float<f32>,
 );
 
 named!(parse_face_index<u32>,
-	do_parse!(
-		num: digit >>
-		(str::from_utf8(num).unwrap().parse::<u32>().unwrap())
-	)
+	do_parse!(num: digit >> (str::from_utf8(num).unwrap().parse::<u32>().unwrap()))
 );
 
 named!(parse_vector3<&[u8], Vector3<f32>>,
@@ -86,9 +83,7 @@ named!(texcoord<&[u8], Vector3<f32>>,
 		v: parse_float >>
 		opt!(space) >>
 		w: opt!(parse_float) >>
-		({
-			Vector3::new(u, v, w.unwrap_or(0.0))
-		})
+		(Vector3::new(u, v, w.unwrap_or(0.0)))
 	)
 );
 named!(face <&[u8], Face>,
@@ -101,11 +96,9 @@ named!(face <&[u8], Face>,
 		space >>
 		v3: parse_face_index >> tag!("/") >> vt3: opt!(parse_face_index) >> tag!("/") >> vn3: parse_face_index >>
 		line_ending >>
-		({
-			Face {
-				vertices: [ v1, v2, v3 ],
-				normals: [ vn1, vn2, vn3 ],
-			}
+		(Face {
+			vertices: [ v1, v2, v3 ],
+			normals: [ vn1, vn2, vn3 ],
 		})
 	)
 );
@@ -169,16 +162,14 @@ named!(vertex_group<&[u8], WavefrontObject>,
 		material: opt!(usemtl) >>
 		smoothing: opt!(smoothing) >>
 		faces: faces_aggregator >>
-		({
-			WavefrontObject {
-				name: name,
-				vertices: vertices,
-				normals: normals,
-				texcoords: textcoords,
-				material: material,
-				smoothing: smoothing,
-				faces: faces,
-			}
+		(WavefrontObject {
+			name: name,
+			vertices: vertices,
+			normals: normals,
+			texcoords: textcoords,
+			material: material,
+			smoothing: smoothing,
+			faces: faces,
 		})
 	)
 );
@@ -188,11 +179,9 @@ named!(obj_file<&[u8], WavefrontModel>,
 		many0!(comment) >>
 		mtllib: opt!(mtllib) >>
 		objects: many1!(vertex_group) >>
-		({
-			WavefrontModel {
-				mtllib: mtllib,
-				objects: objects,
-			}
+		(WavefrontModel {
+			mtllib: mtllib,
+			objects: objects,
 		})
 	)
 );
