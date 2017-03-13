@@ -21,7 +21,7 @@ struct WavefrontObject {
 
 #[derive(Debug)]
 pub struct WavefrontModel {
-	mtllib: Option<String>,
+	pub mtllib: Option<String>,
 	objects: Vec<WavefrontObject>,
 }
 

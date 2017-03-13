@@ -7,27 +7,14 @@ use std::error::Error;
 use std::fs::File;
 use std::io::prelude::*;
 use std::path::Path;
+use std::str;
 
 mod wavefront;
 
-// fn parse_obj_file(input: &String) -> Result<WavefrontModel, String> {
-// 	match obj_file(input.as_bytes()) {
-// 		IResult::Done(_, object) => Ok(object),
-// 		IResult::Incomplete(need) => {
-// 			Err(format!("Incomplete, {:?}", need))
-// 		},
-// 		IResult::Error(err) => {
-// 			Err(format!("Some error: {:?}", err))
-// 		}
-// 	}
-// }
-
 fn main() {
-	// Create a path to the desired file
     let path = Path::new("./assets/cube.obj");
     let display = path.display();
 
-    // Open the path in read-only mode, returns `io::Result<File>`
     let mut file = match File::open(&path) {
         Err(why) => panic!("couldn't open {}: {}", display, why.description()),
         Ok(file) => file,
@@ -40,7 +27,38 @@ fn main() {
         Ok(_) => ()
     }
 
-	let obj = wavefront::parse_obj_string(&s);
+	let obj = wavefront::parse_obj_string(&s).unwrap();
 
-	println!("{:?}", obj);
+    let materials = match obj.mtllib {
+        Some(ref filename) => {
+            let pathname = format!("./assets/{}", filename);
+
+            let path = Path::new(&pathname);
+            let display = path.display();
+
+            let mut file = match File::open(&path) {
+                Err(why) => panic!("couldn't open {}: {}", display, why.description()),
+                Ok(file) => file,
+            };
+
+            let mut mtlstring = String::new();
+
+            match file.read_to_string(&mut mtlstring) {
+                Err(why) => panic!("couldn't read {}: {}", display, why.description()),
+                Ok(_) => ()
+            }
+
+            match wavefront::parse_mtl_string(&mtlstring) {
+                Ok(materials) => Some(materials),
+                Err(err) => {
+                    println!("Material parse error: {}", err);
+
+                    None
+                }
+            }
+        },
+        None => None
+    };
+
+	println!("{:?}", materials);
 }
