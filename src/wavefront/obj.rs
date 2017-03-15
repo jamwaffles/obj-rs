@@ -1,6 +1,12 @@
 use nom::{ space, digit, line_ending, IResult, not_line_ending };
 use nalgebra::{ Vector3 };
 use std::str;
+use std::fs::File;
+use std::io::prelude::*;
+use std::path::Path;
+use std::error::Error;
+
+use super::mtl;
 
 #[derive(Debug)]
 struct Face {
@@ -21,8 +27,33 @@ struct WavefrontObject {
 
 #[derive(Debug)]
 pub struct WavefrontModel {
-	pub mtllib: Option<String>,
+	materials: Option<mtl::WavefrontMaterials>,
 	objects: Vec<WavefrontObject>,
+}
+
+#[derive(Copy, Clone)]
+struct BufferVertex {
+    position: [ f32; 3 ],
+    color: [ f32; 3 ],
+}
+
+// you must pass the list of members to the macro
+// implement_vertex!(Vertex, position, normal);
+implement_vertex!(BufferVertex, position);
+
+impl WavefrontModel {
+	// pub fn to_vertices() -> (Vec<Vertex>, Vec<u32>) {
+	pub fn to_vertices(&self) -> (Vec<BufferVertex>, Vec<u32>) {
+		let object = self.objects.get(0).unwrap();
+
+		let vertices = object.vertices.iter().map(|v| BufferVertex { position: [ v.x, v.y, v.z ], color: [ 1.0, 0.0, 0.0 ] }).collect();
+
+		let indices = object.faces.iter().flat_map(|f| [ f.vertices[0], f.vertices[1], f.vertices[2] ].to_vec()).collect();
+
+		println!("{:?}", indices);
+
+		(vertices, indices)
+	}
 }
 
 named!(negative, tag!("-"));
@@ -174,19 +205,19 @@ named!(vertex_group<&[u8], WavefrontObject>,
 	)
 );
 
-named!(obj_file<&[u8], WavefrontModel>,
+named!(obj_file<&[u8], (Vec<WavefrontObject>, Option<String>)>,
 	do_parse!(
 		many0!(comment) >>
 		mtllib: opt!(mtllib) >>
 		objects: many1!(vertex_group) >>
-		(WavefrontModel {
-			mtllib: mtllib,
-			objects: objects,
-		})
+		((
+			objects,
+			mtllib
+		))
 	)
 );
 
-pub fn parse(input: &[u8]) -> Result<WavefrontModel, String> {
+fn parse(input: &[u8]) -> Result<(Vec<WavefrontObject>, Option<String>), String> {
 	match obj_file(input) {
 		IResult::Done(_, object) => Ok(object),
 		IResult::Incomplete(need) => {
@@ -196,4 +227,50 @@ pub fn parse(input: &[u8]) -> Result<WavefrontModel, String> {
 			Err(format!("Some error: {:?}", err))
 		}
 	}
+}
+
+pub fn load(pathname: &str) -> Result<WavefrontModel, String> {
+	let path = Path::new(pathname);
+    let display = path.display();
+
+    let mut file = match File::open(&path) {
+        Err(why) => panic!("couldn't open {}: {}", display, why.description()),
+        Ok(file) => file,
+    };
+
+    let mut s = String::new();
+
+    match file.read_to_string(&mut s) {
+        Err(why) => panic!("couldn't read {}: {}", display, why.description()),
+        Ok(_) => ()
+    }
+
+	let (objects, mtllib) = parse(&s.as_bytes()).unwrap();
+
+	let materials = match mtllib {
+		Some(mtl_filename) => {
+			let mtl_path = path.with_file_name(mtl_filename);
+			let mtl_display = mtl_path.display();
+
+			let mut mtl_file = match File::open(&mtl_path) {
+				Err(why) => panic!("couldn't open {}: {}", mtl_display, why.description()),
+				Ok(file) => file,
+			};
+
+			let mut mtl_s = String::new();
+
+			match mtl_file.read_to_string(&mut mtl_s) {
+				Err(why) => panic!("couldn't read {}: {}", mtl_display, why.description()),
+				Ok(_) => ()
+			}
+
+			Some(mtl::parse(&mtl_s.as_bytes()).unwrap())
+		},
+		None => None
+	};
+
+	Ok(WavefrontModel {
+		objects: objects,
+		materials: materials,
+	})
 }

@@ -4,6 +4,8 @@ use nalgebra::{ Vector3 };
 use std::str;
 use std::collections::HashMap;
 
+pub type WavefrontMaterials = HashMap<String, WavefrontMaterial>;
+
 #[derive(Debug)]
 pub struct WavefrontMaterial {
 	name: String,
@@ -106,7 +108,7 @@ named!(mtl_file<&[u8], Vec<WavefrontMaterial>>,
 	)
 );
 
-pub fn parse(input: &[u8]) -> Result<HashMap<String, WavefrontMaterial>, String> {
+pub fn parse(input: &[u8]) -> Result<WavefrontMaterials, String> {
 	match mtl_file(input) {
 		IResult::Done(_, materials) => {
 			let mut map = HashMap::new();
