@@ -60,6 +60,7 @@ fn main() {
     // building the display, ie. the main object
     let display = glutin::WindowBuilder::new()
         .with_dimensions(1280, 720)
+        .with_depth_buffer(24)
         .build_glium()
         .unwrap();
 
@@ -108,7 +109,7 @@ fn main() {
 
     // Our camera looks toward the point (1.0, 0.0, 0.0).
     // It is located at (0.0, 0.0, 1.0).
-    let eye    = Point3::new(1.0, 1.0, 1.0);
+    let eye    = Point3::new(-1.0, 1.0, 1.0);
     let target = Point3::new(0.0, 0.0, 0.0);
     let view   = Isometry3::look_at_rh(&eye, &target, &Vector3::z());
 
@@ -195,7 +196,12 @@ fn main() {
     ).unwrap();
 
     let params = glium::DrawParameters {
-        backface_culling: BackfaceCullingMode::CullCounterClockwise,
+        depth: glium::Depth {
+            test: glium::DepthTest::IfLess,
+            write: true,
+            .. Default::default()
+        },
+        backface_culling: BackfaceCullingMode::CullingDisabled,
         .. Default::default()
     };
 
@@ -214,7 +220,7 @@ fn main() {
 
         // drawing a frame
         let mut target = display.draw();
-        target.clear_color(0.0, 0.0, 0.0, 0.0);
+        target.clear_color_and_depth((0.0, 0.0, 0.0, 0.0), 1.0);
         target.draw(&vertex_buffer, &index_buffer, &program, &uniforms, &params).unwrap();
         target.finish().unwrap();
 
