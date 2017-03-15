@@ -50,6 +50,41 @@ pub fn start_loop<F>(mut callback: F) where F: FnMut() -> Action {
     }
 }
 
+fn get_matrices(eye: &Point3<f32>, target: &Point3<f32>, projection: &Perspective3<f32>) -> ([[f32; 4]; 4], [[f32; 4]; 4]) {
+    // No translation or rotation
+    let model = Isometry3::new(na::zero(), na::zero());
+
+    let view   = Isometry3::look_at_rh(&eye, &target, &Vector3::z());
+
+    // The combination of the model with the view is still an isometry.
+    let model_view = view * model;
+
+    // Convert everything to a `Matrix4` so that they can be combined.
+    let mat_model_view = model_view.to_homogeneous();
+
+    // Combine everything.
+    let model_view_projection = projection.as_matrix() * mat_model_view;
+
+    let p = projection.as_matrix().as_slice();
+    let v = view.to_homogeneous();
+
+    let perspective_mat = [
+        [ p[0], p[1], p[2], p[3] ],
+        [ p[4], p[5], p[6], p[7] ],
+        [ p[8], p[9], p[10], p[11] ],
+        [ p[12], p[13], p[14], p[15] ],
+    ];
+
+    let view_mat = [
+        [ v[0], v[1], v[2], v[3] ],
+        [ v[4], v[5], v[6], v[7] ],
+        [ v[8], v[9], v[10], v[11] ],
+        [ v[12], v[13], v[14], v[15] ],
+    ];
+
+    (perspective_mat, view_mat)
+}
+
 fn main() {
     let model = obj::load("./assets/cube.obj");
 
@@ -103,61 +138,9 @@ fn main() {
                                                4, 5, 6, 4, 6, 7,
                                                8, 9, 10, 8, 11, 9 ]).unwrap();
 
-
-    // No translation or rotation
-    let model = Isometry3::new(na::zero(), na::zero());
-
-    // Our camera looks toward the point (1.0, 0.0, 0.0).
-    // It is located at (0.0, 0.0, 1.0).
-    let eye    = Point3::new(-1.0, 1.0, 1.0);
-    let target = Point3::new(0.0, 0.0, 0.0);
-    let view   = Isometry3::look_at_rh(&eye, &target, &Vector3::z());
-
     // A perspective projection.
-    let perspective = Perspective3::new(16.0f32 / 9.0, 3.14 / 2.0, 1.0, 1000.0);
-
-    // The combination of the model with the view is still an isometry.
-    let model_view = view * model;
-
-    // Convert everything to a `Matrix4` so that they can be combined.
-    let mat_model_view = model_view.to_homogeneous();
-
-    // Combine everything.
-    let model_view_projection = perspective.as_matrix() * mat_model_view;
-
-    println!("{:?}", perspective.as_matrix());
-    println!("{:?}", view.to_homogeneous());
-
-    let p = perspective.as_matrix().as_slice();
-    let v = view.to_homogeneous();
-
-    let perspective_mat = [
-        [ p[0], p[1], p[2], p[3] ],
-        [ p[4], p[5], p[6], p[7] ],
-        [ p[8], p[9], p[10], p[11] ],
-        [ p[12], p[13], p[14], p[15] ],
-    ];
-
-    let view_mat = [
-        [ v[0], v[1], v[2], v[3] ],
-        [ v[4], v[5], v[6], v[7] ],
-        [ v[8], v[9], v[10], v[11] ],
-        [ v[12], v[13], v[14], v[15] ],
-    ];
-
-    // let perspective_mat = [
-    //     [ p[0], p[4], p[8], p[12] ],
-    //     [ p[1], p[5], p[9], p[13] ],
-    //     [ p[2], p[6], p[10], p[14] ],
-    //     [ p[3], p[7], p[11], p[15] ],
-    // ];
-
-    // let view_mat = [
-    //     [ v[0], v[4], v[8], v[12] ],
-    //     [ v[1], v[5], v[9], v[13] ],
-    //     [ v[2], v[6], v[10], v[14] ],
-    //     [ v[3], v[7], v[11], v[15] ],
-    // ];
+    let perspective = Perspective3::new(16.0f32 / 9.0, 3.14 / 2.0, 0.1, 1000.0);
+    let target = Point3::new(0.0, 0.0, 0.0);
 
     let program = program!(&display,
         140 => {
@@ -205,15 +188,15 @@ fn main() {
         .. Default::default()
     };
 
+    let mut angle = 0.0;
+
     start_loop(|| {
+        let eye = Point3::new(f32::sin(angle), f32::cos(angle), 1.0);
+
+        let (perspective_mat, view_mat) = get_matrices(&eye, &target, &perspective);
+
         // building the uniforms
         let uniforms = uniform! {
-            // matrix: [
-            //     [1.0, 0.0, 0.0, 0.0],
-            //     [0.0, 1.0, 0.0, 0.0],
-            //     [0.0, 0.0, 1.0, 0.0],
-            //     [0.0, 0.0, 0.0, 1.0f32]
-            // ]
             persp_matrix: perspective_mat,
             view_matrix: view_mat,
         };
@@ -231,6 +214,8 @@ fn main() {
                 _ => ()
             }
         }
+
+        angle += 0.01;
 
         Action::Continue
     });
