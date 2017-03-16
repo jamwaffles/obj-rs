@@ -64,7 +64,7 @@ fn main() {
 
     // println!("{:?}", model);
 
-    model.unwrap().to_vertices();
+    let (vertices, indices) = model.unwrap().to_vertices();
 
     // building the display, ie. the main object
     let mut display: GliumWindow = WindowSettings::new(
@@ -79,43 +79,47 @@ fn main() {
         .unwrap();
 
     // building the vertex buffer, which contains all the vertices that we will draw
-    let vertex_buffer = {
-        #[derive(Copy, Clone)]
-        struct Vertex {
-            position: [f32; 3],
-            color: [f32; 3],
-        }
+    // let vertex_buffer = {
+    //     #[derive(Copy, Clone)]
+    //     struct Vertex {
+    //         position: [f32; 3],
+    //         color: [f32; 3],
+    //     }
 
-        implement_vertex!(Vertex, position, color);
+    //     implement_vertex!(Vertex, position, color);
 
-        glium::VertexBuffer::new(&display,
-            &[
-                // X/Y plane, Z is up, green
-                Vertex { position: [ 0.0, 0.0, 0.0], color: [0.0, 1.0, 0.0] },
-                Vertex { position: [ 0.0, 0.5, 0.0], color: [0.0, 1.0, 0.0] },
-                Vertex { position: [ 0.5, 0.0, 0.0], color: [0.0, 1.0, 0.0] },
-                Vertex { position: [ 0.5, 0.5, 0.0], color: [0.0, 1.0, 0.0] },
+    //     glium::VertexBuffer::new(&display,
+    //         &[
+    //             // X/Y plane, Z is up, green
+    //             Vertex { position: [ 0.0, 0.0, 0.0], color: [0.0, 1.0, 0.0] },
+    //             Vertex { position: [ 0.0, 0.5, 0.0], color: [0.0, 1.0, 0.0] },
+    //             Vertex { position: [ 0.5, 0.0, 0.0], color: [0.0, 1.0, 0.0] },
+    //             Vertex { position: [ 0.5, 0.5, 0.0], color: [0.0, 1.0, 0.0] },
 
-                // Y/Z plane, X is up, red
-                Vertex { position: [ 0.0, 0.0, 0.0], color: [1.0, 0.0, 0.0] },
-                Vertex { position: [ 0.0, 0.0, 0.5], color: [1.0, 0.0, 0.0] },
-                Vertex { position: [ 0.0, 0.5, 0.5], color: [1.0, 0.0, 0.0] },
-                Vertex { position: [ 0.0, 0.5, 0.0], color: [1.0, 0.0, 0.0] },
+    //             // Y/Z plane, X is up, red
+    //             Vertex { position: [ 0.0, 0.0, 0.0], color: [1.0, 0.0, 0.0] },
+    //             Vertex { position: [ 0.0, 0.0, 0.5], color: [1.0, 0.0, 0.0] },
+    //             Vertex { position: [ 0.0, 0.5, 0.5], color: [1.0, 0.0, 0.0] },
+    //             Vertex { position: [ 0.0, 0.5, 0.0], color: [1.0, 0.0, 0.0] },
 
-                // X/Z plane, Y (forward) is up, blue
-                Vertex { position: [ 0.0, 0.0, 0.0], color: [0.0, 0.0, 1.0] },
-                Vertex { position: [ 0.5, 0.0, 0.5], color: [0.0, 0.0, 1.0] },
-                Vertex { position: [ 0.0, 0.0, 0.5], color: [0.0, 0.0, 1.0] },
-                Vertex { position: [ 0.5, 0.0, 0.0], color: [0.0, 0.0, 1.0] },
-            ]
-        ).unwrap()
-    };
+    //             // X/Z plane, Y (forward) is up, blue
+    //             Vertex { position: [ 0.0, 0.0, 0.0], color: [0.0, 0.0, 1.0] },
+    //             Vertex { position: [ 0.5, 0.0, 0.5], color: [0.0, 0.0, 1.0] },
+    //             Vertex { position: [ 0.0, 0.0, 0.5], color: [0.0, 0.0, 1.0] },
+    //             Vertex { position: [ 0.5, 0.0, 0.0], color: [0.0, 0.0, 1.0] },
+    //         ]
+    //     ).unwrap()
+    // };
 
     // building the index buffer
-    let index_buffer = glium::IndexBuffer::new(&display, PrimitiveType::TrianglesList,
-                                               &[0u16, 1, 3, 0, 3, 2,
-                                               4, 5, 6, 4, 6, 7,
-                                               8, 9, 10, 8, 11, 9 ]).unwrap();
+    // let index_buffer = glium::IndexBuffer::new(&display, PrimitiveType::TrianglesList,
+    //                                            &[0u16, 1, 3, 0, 3, 2,
+    //                                            4, 5, 6, 4, 6, 7,
+    //                                            8, 9, 10, 8, 11, 9 ]).unwrap();
+
+    let vertex_buffer = glium::VertexBuffer::new(&display, &vertices.as_slice()).unwrap();
+
+    let index_buffer = glium::IndexBuffer::new(&display, PrimitiveType::TrianglesList, &indices.as_slice()).unwrap();
 
     // A perspective projection.
     let perspective = Perspective3::new(16.0f32 / 9.0, 3.14 / 2.0, 0.1, 1000.0);
@@ -174,7 +178,7 @@ fn main() {
     while let Some(e) = events.next(&mut display) {
         match e {
             Input::Render(_) => {
-                let eye = Point3::new(f32::sin(angle), f32::cos(angle), 1.0);
+                let eye = Point3::new(f32::sin(angle) * 5.0, f32::cos(angle) * 5.0, 5.0);
 
                 let (perspective_mat, view_mat) = get_matrices(&eye, &target, &perspective);
 
