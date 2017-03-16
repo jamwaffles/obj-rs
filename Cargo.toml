@@ -3,6 +3,11 @@ name = "obj-rs"
 version = "0.1.0"
 authors = ["James Waples <jamwaffles@gmail.com>"]
 
+[dependencies]
+piston = "*"
+piston_window = "*"
+pistoncore-glutin_window = "0.35.0"
+
 [dependencies.glium]
 version = "0.16.0"
 

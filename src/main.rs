@@ -5,50 +5,39 @@ extern crate nom;
 extern crate glium;
 
 extern crate nalgebra;
+extern crate piston;
+extern crate piston_window;
+extern crate glutin_window;
 
 mod wavefront;
+// mod window;
+// mod backend;
 
-use std::thread;
 use wavefront::obj;
-use std::time::{Duration, Instant};
-use glium::Surface;
-use glium::glutin;
+
+use std::rc::Rc;
+use std::cell::RefCell;
+use std::thread;
+use std::time::{ Duration, Instant };
+use std::os::raw::c_void;
+use glium::{ Surface, GliumCreationError, Frame, SwapBuffersError };
 use glium::index::PrimitiveType;
-use glium::DisplayBuild;
+use glutin_window::GlutinWindow;
 use glium::draw_parameters::BackfaceCullingMode;
-use glium::uniforms::UniformValue::Mat4;
 use nalgebra::{ Point3, Vector3, Perspective3, Isometry3 };
 use nalgebra as na;
+use piston_window::{ Input, OpenGL, OpenGLWindow, Size, BuildFromWindowSettings };
+use piston::event_loop::{Events, EventSettings, EventLoop};
+use piston::window::{ Window, WindowSettings };
+use glium::backend::{ Backend, Context, Facade };
 
 pub enum Action {
     Stop,
     Continue,
 }
 
-pub fn start_loop<F>(mut callback: F) where F: FnMut() -> Action {
-    let mut accumulator = Duration::new(0, 0);
-    let mut previous_clock = Instant::now();
-
-    loop {
-        match callback() {
-            Action::Stop => break,
-            Action::Continue => ()
-        };
-
-        let now = Instant::now();
-        accumulator += now - previous_clock;
-        previous_clock = now;
-
-        let fixed_time_stamp = Duration::new(0, 16666667);
-        while accumulator >= fixed_time_stamp {
-            accumulator -= fixed_time_stamp;
-
-            // if you have a game, update the state here
-        }
-
-        thread::sleep(fixed_time_stamp - accumulator);
-    }
-}
+#[derive(Clone)]
+struct Wrapper<W>(Rc<RefCell<W>>);
 
 fn get_matrices(eye: &Point3<f32>, target: &Point3<f32>, projection: &Perspective3<f32>) -> ([[f32; 4]; 4], [[f32; 4]; 4]) {
     // No translation or rotation
@@ -85,6 +74,100 @@ fn get_matrices(eye: &Point3<f32>, target: &Point3<f32>, projection: &Perspectiv
     (perspective_mat, view_mat)
 }
 
+pub struct GliumWindow<W = GlutinWindow> {
+    pub window: Rc<RefCell<W>>,
+    pub context: Rc<Context>,
+    pub events: Events
+}
+
+impl<W> BuildFromWindowSettings for GliumWindow<W> where W: 'static + Window + OpenGLWindow + BuildFromWindowSettings
+{
+    fn build_from_window_settings(settings: &WindowSettings) -> Result<GliumWindow<W>, String> {
+        // Turn on sRGB.
+        let settings = settings.clone().srgb(true);
+        GliumWindow::new(&Rc::new(RefCell::new(try!(settings.build()))))
+            .map_err(|err| match err {
+                GliumCreationError::BackendCreationError(..) =>
+                    "Error while creating the backend",
+                GliumCreationError::IncompatibleOpenGl(..) =>
+                    "The OpenGL implementation is too old to work with glium",
+            }.into())
+    }
+}
+
+impl<W> GliumWindow<W> where W: OpenGLWindow + 'static {
+    /// Creates new GliumWindow.
+    pub fn new(window: &Rc<RefCell<W>>) -> Result<Self, GliumCreationError<()>> {
+        unsafe {
+            Context::new(Wrapper(window.clone()), true, Default::default())
+        }.map(|context| GliumWindow {
+            window: window.clone(),
+            context: context,
+            events: Events::new(EventSettings::new()).swap_buffers(false)
+        })
+    }
+
+    /// Returns new frame.
+    pub fn draw(&self) -> Frame {
+        Frame::new(self.context.clone(), self.context.get_framebuffer_dimensions())
+    }
+
+    /// Returns next event.
+    pub fn next(&mut self) -> Option<Input> {
+        self.events.next(&mut *self.window.borrow_mut())
+    }
+}
+
+impl<W> Facade for GliumWindow<W> {
+    fn get_context(&self) -> &Rc<Context> {
+        &self.context
+    }
+}
+
+impl<W> Window for GliumWindow<W> where W: Window {
+    fn should_close(&self) -> bool { self.window.borrow().should_close() }
+    fn set_should_close(&mut self, value: bool) {
+        self.window.borrow_mut().set_should_close(value)
+    }
+    fn size(&self) -> Size { self.window.borrow().size() }
+    fn draw_size(&self) -> Size { self.window.borrow().draw_size() }
+    fn swap_buffers(&mut self) { self.window.borrow_mut().swap_buffers() }
+    fn poll_event(&mut self) -> Option<Input> {
+        Window::poll_event(&mut *self.window.borrow_mut())
+    }
+    fn wait_event(&mut self) -> Input {
+        Window::wait_event(&mut *self.window.borrow_mut())
+    }
+    fn wait_event_timeout(&mut self, duration: Duration) -> Option<Input> {
+        let mut window = self.window.borrow_mut();
+        Window::wait_event_timeout(&mut *window, duration)
+    }
+}
+
+unsafe impl<W> Backend for Wrapper<W> where W: OpenGLWindow {
+    fn swap_buffers(&self) -> Result<(), SwapBuffersError> {
+        self.0.borrow_mut().swap_buffers();
+        Ok(())
+    }
+
+    unsafe fn get_proc_address(&self, proc_name: &str) -> *const c_void {
+        self.0.borrow_mut().get_proc_address(proc_name) as *const c_void
+    }
+
+    fn get_framebuffer_dimensions(&self) -> (u32, u32) {
+        let size = self.0.borrow().draw_size();
+        (size.width, size.height)
+    }
+
+    fn is_current(&self) -> bool {
+        self.0.borrow().is_current()
+    }
+
+    unsafe fn make_current(&self) {
+        self.0.borrow_mut().make_current()
+    }
+}
+
 fn main() {
     let model = obj::load("./assets/cube.obj");
 
@@ -93,10 +176,14 @@ fn main() {
     model.unwrap().to_vertices();
 
     // building the display, ie. the main object
-    let display = glutin::WindowBuilder::new()
-        .with_dimensions(1280, 720)
-        .with_depth_buffer(24)
-        .build_glium()
+    let mut display: GliumWindow = WindowSettings::new(
+            "Test",
+            [1280, 720]
+        )
+        .exit_on_esc(true)
+        .samples(4)
+        .opengl(OpenGL::V3_2)
+        .build()
         .unwrap();
 
     // building the vertex buffer, which contains all the vertices that we will draw
@@ -190,7 +277,9 @@ fn main() {
 
     let mut angle = 0.0;
 
-    start_loop(|| {
+    let mut events = Events::new(EventSettings::new().lazy(true));
+
+    while let Some(e) = events.next(&mut display) {
         let eye = Point3::new(f32::sin(angle), f32::cos(angle), 1.0);
 
         let (perspective_mat, view_mat) = get_matrices(&eye, &target, &perspective);
@@ -206,17 +295,5 @@ fn main() {
         target.clear_color_and_depth((0.0, 0.0, 0.0, 0.0), 1.0);
         target.draw(&vertex_buffer, &index_buffer, &program, &uniforms, &params).unwrap();
         target.finish().unwrap();
-
-        // polling and handling the events received by the window
-        for event in display.poll_events() {
-            match event {
-                glutin::Event::Closed => return Action::Stop,
-                _ => ()
-            }
-        }
-
-        angle += 0.01;
-
-        Action::Continue
-    });
+    }
 }
