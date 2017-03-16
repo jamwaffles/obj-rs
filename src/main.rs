@@ -25,19 +25,7 @@ use piston::event_loop::{ Events, EventSettings, EventLoop };
 use piston::window::{ WindowSettings };
 
 fn get_matrices(eye: &Point3<f32>, target: &Point3<f32>, projection: &Perspective3<f32>) -> ([[f32; 4]; 4], [[f32; 4]; 4]) {
-    // No translation or rotation
-    // let model = Isometry3::new(na::zero(), na::zero());
-
-    let view   = Isometry3::look_at_rh(&eye, &target, &Vector3::z());
-
-    // The combination of the model with the view is still an isometry.
-    // let model_view = view * model;
-
-    // // Convert everything to a `Matrix4` so that they can be combined.
-    // let mat_model_view = model_view.to_homogeneous();
-
-    // // Combine everything.
-    // let model_view_projection = projection.as_matrix() * mat_model_view;
+    let view = Isometry3::look_at_rh(&eye, &target, &Vector3::z());
 
     let p = projection.as_matrix().as_slice();
     let v = view.to_homogeneous();
@@ -75,8 +63,6 @@ fn model_matrix(translate: &Vector3<f32>, rotate: &Vector3<f32>) -> [[f32; 4]; 4
 fn main() {
     let model = obj::load("./assets/cube.obj");
 
-    // println!("{:?}", model);
-
     let (vertices, material) = model.unwrap().to_vertices();
 
     // building the display, ie. the main object
@@ -87,45 +73,6 @@ fn main() {
         .vsync(true)
         .build()
         .unwrap();
-
-    // building the vertex buffer, which contains all the vertices that we will draw
-    // let vertex_buffer = {
-    //     #[derive(Copy, Clone)]
-    //     struct Vertex {
-    //         position: [f32; 3],
-    //         color: [f32; 3],
-    //     }
-
-    //     implement_vertex!(Vertex, position, color);
-
-    //     glium::VertexBuffer::new(&display,
-    //         &[
-    //             // X/Y plane, Z is up, green
-    //             Vertex { position: [ 0.0, 0.0, 0.0], color: [0.0, 1.0, 0.0] },
-    //             Vertex { position: [ 0.0, 0.5, 0.0], color: [0.0, 1.0, 0.0] },
-    //             Vertex { position: [ 0.5, 0.0, 0.0], color: [0.0, 1.0, 0.0] },
-    //             Vertex { position: [ 0.5, 0.5, 0.0], color: [0.0, 1.0, 0.0] },
-
-    //             // Y/Z plane, X is up, red
-    //             Vertex { position: [ 0.0, 0.0, 0.0], color: [1.0, 0.0, 0.0] },
-    //             Vertex { position: [ 0.0, 0.0, 0.5], color: [1.0, 0.0, 0.0] },
-    //             Vertex { position: [ 0.0, 0.5, 0.5], color: [1.0, 0.0, 0.0] },
-    //             Vertex { position: [ 0.0, 0.5, 0.0], color: [1.0, 0.0, 0.0] },
-
-    //             // X/Z plane, Y (forward) is up, blue
-    //             Vertex { position: [ 0.0, 0.0, 0.0], color: [0.0, 0.0, 1.0] },
-    //             Vertex { position: [ 0.5, 0.0, 0.5], color: [0.0, 0.0, 1.0] },
-    //             Vertex { position: [ 0.0, 0.0, 0.5], color: [0.0, 0.0, 1.0] },
-    //             Vertex { position: [ 0.5, 0.0, 0.0], color: [0.0, 0.0, 1.0] },
-    //         ]
-    //     ).unwrap()
-    // };
-
-    // building the index buffer
-    // let index_buffer = glium::IndexBuffer::new(&display, PrimitiveType::TrianglesList,
-    //                                            &[0u16, 1, 3, 0, 3, 2,
-    //                                            4, 5, 6, 4, 6, 7,
-    //                                            8, 9, 10, 8, 11, 9 ]).unwrap();
 
     let vertex_buffer = glium::VertexBuffer::new(&display, &vertices.as_slice()).unwrap();
 
@@ -145,7 +92,6 @@ fn main() {
                 in vec3 normal;
 
                 out vec3 v_position;
-                // out vec3 v_color;
                 out vec3 v_normal;
                 out vec3 frag_pos;
 
@@ -184,11 +130,6 @@ fn main() {
 
                     vec3 result = (ambient + diffuse) * mat_diffuse;
                     f_color = vec4(result, 1.0f);
-
-                    // vec3 result = ambient * mat_ambient;
-                    // f_color = vec4(result, 1.0f);
-
-                    // f_color = vec4(mat_diffuse, 1.0);
                 }
             ",
         },
@@ -211,7 +152,7 @@ fn main() {
     while let Some(e) = events.next(&mut display) {
         match e {
             Input::Render(_) => {
-                let eye = Point3::new(f32::sin(angle) * 3.0, f32::cos(angle) * 3.0, 3.0);
+                let eye = Point3::new(3.0, 3.0, 3.0);
 
                 let (perspective_mat, view_mat) = get_matrices(&eye, &target, &perspective);
 
@@ -219,7 +160,7 @@ fn main() {
                 let uniforms = uniform! {
                     persp_matrix: perspective_mat,
                     view_matrix: view_mat,
-                    model_matrix: model_matrix(&Vector3::new(0.0, 0.0, 0.0), &Vector3::new(0.0, 0.0, 0.0)),
+                    model_matrix: model_matrix(&Vector3::new(0.0, 0.0, 0.0), &Vector3::new(0.0, 0.0, angle)),
 
                     mat_ambient: material.ambient,
                     mat_diffuse: material.diffuse,
