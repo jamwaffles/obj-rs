@@ -35,13 +35,12 @@ pub struct WavefrontModel {
 pub struct BufferVertex {
     position: [ f32; 3 ],
 	normal: [ f32; 3 ],
-    color: [ f32; 3 ],
 }
 
-implement_vertex!(BufferVertex, position, normal, color);
+implement_vertex!(BufferVertex, position, normal);
 
 impl WavefrontModel {
-	pub fn to_vertices(&self) -> Vec<BufferVertex> {
+	pub fn to_vertices(&self) -> (Vec<BufferVertex>, mtl::WavefrontMaterial) {
 		let object = self.objects.get(0).unwrap();
 
 		let material = match object.material {
@@ -59,10 +58,17 @@ impl WavefrontModel {
 			None => None
 		};
 
-		let diffuse = match material {
-			Some(mat) => mat.diffuse,
-			None => [ 0.7, 0.7, 0.7 ]
-		};
+		// let thingy = match material {
+		// 	Some(ref mat) => *mat.clone(),
+		// 	None => mtl::WavefrontMaterial {
+		// 		name: String::from("Default material"),
+		// 		specular_exponent: 1.0,
+		// 		ambient: [0.7, 0.7, 0.7],
+		// 		diffuse: [0.7, 0.7, 0.7],
+		// 		specular: [0.7, 0.7, 0.7],
+		// 		illum: 10,
+		// 	}
+		// };
 
 		let vertices = object.faces.iter().flat_map(|f| {
 			let v1 = object.vertices.get(f.vertices[0] as usize).unwrap();
@@ -77,24 +83,31 @@ impl WavefrontModel {
 				BufferVertex {
 					position: [ v1.x, v1.y, v1.z ],
 					normal: [ vn1.x, vn1.y, vn1.z ],
-					color: diffuse,
+					// color: diffuse,
 				},
 
 				BufferVertex {
 					position: [ v2.x, v2.y, v2.z ],
 					normal: [ vn2.x, vn2.y, vn2.z ],
-					color: diffuse,
+					// color: diffuse,
 				},
 
 				BufferVertex {
 					position: [ v3.x, v3.y, v3.z ],
 					normal: [ vn3.x, vn3.y, vn3.z ],
-					color: diffuse,
+					// color: diffuse,
 				},
 			]
 		}).collect();
 
-		vertices
+		(vertices, mtl::WavefrontMaterial {
+				name: String::from("Default material"),
+				specular_exponent: 1.0,
+				ambient: [0.1, 0.7, 0.7],
+				diffuse: [0.1, 0.7, 0.7],
+				specular: [0.7, 0.7, 0.7],
+				illum: 10,
+			})
 	}
 }
 

@@ -64,7 +64,7 @@ fn main() {
 
     // println!("{:?}", model);
 
-    let vertices = model.unwrap().to_vertices();
+    let (vertices, material) = model.unwrap().to_vertices();
 
     // building the display, ie. the main object
     let mut display: GliumWindow = WindowSettings::new("Test", [1280, 720])
@@ -127,14 +127,12 @@ fn main() {
                 uniform mat4 persp_matrix;
                 uniform mat4 view_matrix;
                 in vec3 position;
-                in vec3 color;
                 // in vec3 normal;
                 out vec3 v_position;
                 out vec3 v_color;
                 // out vec3 v_normal;
                 void main() {
                     v_position = position;
-                    v_color = color;
                     // v_normal = normal;
                     gl_Position = persp_matrix * view_matrix * vec4(v_position, 1.0);
                 }
@@ -171,13 +169,17 @@ fn main() {
                 #version 330
                 // in vec3 v_normal;
                 in vec3 v_color;
+
+                uniform vec3 mat_ambient;
+                uniform vec3 mat_diffuse;
+
                 out vec4 f_color;
                 const vec3 LIGHT = vec3(-0.2, 0.8, 0.1);
                 void main() {
                     // float lum = max(dot(normalize(v_normal), normalize(LIGHT)), 0.0);
                     // float lum = 1.0;
                     // vec3 color = (0.3 + 0.7 * lum) * vec3(1.0, 1.0, 1.0);
-                    f_color = vec4(v_color, 1.0);
+                    f_color = vec4(mat_diffuse, 1.0);
                 }
             ",
         },
@@ -208,6 +210,9 @@ fn main() {
                 let uniforms = uniform! {
                     persp_matrix: perspective_mat,
                     view_matrix: view_mat,
+
+                    mat_ambient: material.ambient,
+                    mat_diffuse: material.diffuse,
                 };
 
                 // drawing a frame
