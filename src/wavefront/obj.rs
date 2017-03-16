@@ -88,7 +88,7 @@ named!(parse_float<f32>,
 );
 
 named!(parse_face_index<u32>,
-	do_parse!(num: digit >> (str::from_utf8(num).unwrap().parse::<u32>().unwrap()))
+	do_parse!(num: digit >> (str::from_utf8(num).unwrap().parse::<u32>().unwrap() - 1))
 );
 
 named!(parse_vector3<&[u8], Vector3<f32>>,
