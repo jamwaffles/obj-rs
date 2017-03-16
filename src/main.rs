@@ -278,7 +278,7 @@ fn main() {
 
     let mut angle = 0.0;
 
-    let mut events = Events::new(EventSettings::new());
+    let mut events = Events::new(EventSettings::new()).ups(100);
 
     while let Some(e) = events.next(&mut display) {
         match e {
@@ -300,9 +300,7 @@ fn main() {
                 target.finish().unwrap();
             },
             Input::Update(u) => {
-                angle += 1.0 * u.dt as f32;
-
-                println!("{}", u.dt);
+                angle += 2.0 * u.dt as f32;
             },
             _ => {}
         }
