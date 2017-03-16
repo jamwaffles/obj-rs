@@ -183,6 +183,7 @@ fn main() {
         .exit_on_esc(true)
         .samples(4)
         .opengl(OpenGL::V3_2)
+        .vsync(true)
         .build()
         .unwrap();
 
@@ -277,23 +278,33 @@ fn main() {
 
     let mut angle = 0.0;
 
-    let mut events = Events::new(EventSettings::new().lazy(true));
+    let mut events = Events::new(EventSettings::new());
 
     while let Some(e) = events.next(&mut display) {
-        let eye = Point3::new(f32::sin(angle), f32::cos(angle), 1.0);
+        match e {
+            Input::Render(_) => {
+                let eye = Point3::new(f32::sin(angle), f32::cos(angle), 1.0);
 
-        let (perspective_mat, view_mat) = get_matrices(&eye, &target, &perspective);
+                let (perspective_mat, view_mat) = get_matrices(&eye, &target, &perspective);
 
-        // building the uniforms
-        let uniforms = uniform! {
-            persp_matrix: perspective_mat,
-            view_matrix: view_mat,
-        };
+                // building the uniforms
+                let uniforms = uniform! {
+                    persp_matrix: perspective_mat,
+                    view_matrix: view_mat,
+                };
 
-        // drawing a frame
-        let mut target = display.draw();
-        target.clear_color_and_depth((0.0, 0.0, 0.0, 0.0), 1.0);
-        target.draw(&vertex_buffer, &index_buffer, &program, &uniforms, &params).unwrap();
-        target.finish().unwrap();
+                // drawing a frame
+                let mut target = display.draw();
+                target.clear_color_and_depth((0.0, 0.0, 0.0, 0.0), 1.0);
+                target.draw(&vertex_buffer, &index_buffer, &program, &uniforms, &params).unwrap();
+                target.finish().unwrap();
+            },
+            Input::Update(u) => {
+                angle += 1.0 * u.dt as f32;
+
+                println!("{}", u.dt);
+            },
+            _ => {}
+        }
     }
 }
