@@ -1,6 +1,5 @@
 use nom::{ space, digit, line_ending, IResult, not_line_ending, multispace };
 use nom;
-use nalgebra::{ Vector3 };
 use std::str;
 use std::collections::HashMap;
 

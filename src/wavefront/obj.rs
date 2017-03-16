@@ -34,16 +34,14 @@ pub struct WavefrontModel {
 #[derive(Copy, Clone)]
 pub struct BufferVertex {
     position: [ f32; 3 ],
+	normal: [ f32; 3 ],
     color: [ f32; 3 ],
 }
 
-// you must pass the list of members to the macro
-// implement_vertex!(Vertex, position, normal);
-implement_vertex!(BufferVertex, position, color);
+implement_vertex!(BufferVertex, position, normal, color);
 
 impl WavefrontModel {
-	// pub fn to_vertices() -> (Vec<Vertex>, Vec<u32>) {
-	pub fn to_vertices(&self) -> (Vec<BufferVertex>, Vec<u32>) {
+	pub fn to_vertices(&self) -> Vec<BufferVertex> {
 		let object = self.objects.get(0).unwrap();
 
 		let material = match object.material {
@@ -66,16 +64,37 @@ impl WavefrontModel {
 			None => [ 0.7, 0.7, 0.7 ]
 		};
 
-		let vertices = object.vertices.iter().map(|v| BufferVertex {
-			position: [ v.x, v.y, v.z ],
-			color: diffuse,
+		let vertices = object.faces.iter().flat_map(|f| {
+			let v1 = object.vertices.get(f.vertices[0] as usize).unwrap();
+			let v2 = object.vertices.get(f.vertices[1] as usize).unwrap();
+			let v3 = object.vertices.get(f.vertices[2] as usize).unwrap();
+
+			let vn1 = object.normals.get(f.normals[0] as usize).unwrap();
+			let vn2 = object.normals.get(f.normals[1] as usize).unwrap();
+			let vn3 = object.normals.get(f.normals[2] as usize).unwrap();
+
+			vec![
+				BufferVertex {
+					position: [ v1.x, v1.y, v1.z ],
+					normal: [ vn1.x, vn1.y, vn1.z ],
+					color: diffuse,
+				},
+
+				BufferVertex {
+					position: [ v2.x, v2.y, v2.z ],
+					normal: [ vn2.x, vn2.y, vn2.z ],
+					color: diffuse,
+				},
+
+				BufferVertex {
+					position: [ v3.x, v3.y, v3.z ],
+					normal: [ vn3.x, vn3.y, vn3.z ],
+					color: diffuse,
+				},
+			]
 		}).collect();
 
-		let indices = object.faces.iter().flat_map(|f| [ f.vertices[0], f.vertices[1], f.vertices[2] ].to_vec()).collect();
-
-		println!("{:?}", indices);
-
-		(vertices, indices)
+		vertices
 	}
 }
 

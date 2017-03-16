@@ -16,7 +16,7 @@ use wavefront::obj;
 use glium_window::GliumWindow;
 
 use glium::{ Surface };
-use glium::index::PrimitiveType;
+use glium::index::{ PrimitiveType, NoIndices };
 use glium::draw_parameters::BackfaceCullingMode;
 use nalgebra::{ Point3, Vector3, Perspective3, Isometry3 };
 use nalgebra as na;
@@ -64,13 +64,10 @@ fn main() {
 
     // println!("{:?}", model);
 
-    let (vertices, indices) = model.unwrap().to_vertices();
+    let vertices = model.unwrap().to_vertices();
 
     // building the display, ie. the main object
-    let mut display: GliumWindow = WindowSettings::new(
-            "Test",
-            [1280, 720]
-        )
+    let mut display: GliumWindow = WindowSettings::new("Test", [1280, 720])
         .exit_on_esc(true)
         .samples(4)
         .opengl(OpenGL::V3_2)
@@ -119,8 +116,6 @@ fn main() {
 
     let vertex_buffer = glium::VertexBuffer::new(&display, &vertices.as_slice()).unwrap();
 
-    let index_buffer = glium::IndexBuffer::new(&display, PrimitiveType::TrianglesList, &indices.as_slice()).unwrap();
-
     // A perspective projection.
     let perspective = Perspective3::new(16.0f32 / 9.0, 3.14 / 2.0, 0.1, 1000.0);
     let target = Point3::new(0.0, 0.0, 0.0);
@@ -128,7 +123,7 @@ fn main() {
     let program = program!(&display,
         140 => {
             vertex: "
-                #version 140
+                #version 330
                 uniform mat4 persp_matrix;
                 uniform mat4 view_matrix;
                 in vec3 position;
@@ -145,8 +140,35 @@ fn main() {
                 }
             ",
 
+            // geometry: "
+            //     #version 330
+            //     uniform mat4 matrix;
+            //     layout(triangles) in;
+            //     layout(triangle_strip, max_vertices=3) out;
+            //     out vec3 color;
+            //     float rand(vec2 co) {
+            //         return fract(sin(dot(co.xy ,vec2(12.9898,78.233))) * 43758.5453);
+            //     }
+            //     void main() {
+            //         vec3 all_color = vec3(
+            //             rand(gl_in[0].gl_Position.xy + gl_in[1].gl_Position.yz),
+            //             rand(gl_in[1].gl_Position.yx + gl_in[2].gl_Position.zx),
+            //             rand(gl_in[0].gl_Position.xz + gl_in[2].gl_Position.zy)
+            //         );
+            //         gl_Position = matrix * gl_in[0].gl_Position;
+            //         color = all_color;
+            //         EmitVertex();
+            //         gl_Position = matrix * gl_in[1].gl_Position;
+            //         color = all_color;
+            //         EmitVertex();
+            //         gl_Position = matrix * gl_in[2].gl_Position;
+            //         color = all_color;
+            //         EmitVertex();
+            //     }
+            // ",
+
             fragment: "
-                #version 140
+                #version 330
                 // in vec3 v_normal;
                 in vec3 v_color;
                 out vec4 f_color;
@@ -178,7 +200,7 @@ fn main() {
     while let Some(e) = events.next(&mut display) {
         match e {
             Input::Render(_) => {
-                let eye = Point3::new(f32::sin(angle) * 5.0, f32::cos(angle) * 5.0, 5.0);
+                let eye = Point3::new(f32::sin(angle) * 3.0, f32::cos(angle) * 3.0, 3.0);
 
                 let (perspective_mat, view_mat) = get_matrices(&eye, &target, &perspective);
 
@@ -191,7 +213,7 @@ fn main() {
                 // drawing a frame
                 let mut target = display.draw();
                 target.clear_color_and_depth((0.0, 0.0, 0.0, 0.0), 1.0);
-                target.draw(&vertex_buffer, &index_buffer, &program, &uniforms, &params).unwrap();
+                target.draw(&vertex_buffer, NoIndices(PrimitiveType::TrianglesList), &program, &uniforms, &params).unwrap();
                 target.finish().unwrap();
             },
             Input::Update(u) => {
