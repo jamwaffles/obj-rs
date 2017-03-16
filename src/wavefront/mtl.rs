@@ -8,17 +8,17 @@ pub type WavefrontMaterials = HashMap<String, WavefrontMaterial>;
 
 #[derive(Debug)]
 pub struct WavefrontMaterial {
-	name: String,
-	specular_exponent: f32,
-	ambient: Vector3<f32>,
-	diffuse: Vector3<f32>,
-	specular: Vector3<f32>,
-	illum: u32,
+	pub name: String,
+	pub specular_exponent: f32,
+	pub ambient: [f32; 3],
+	pub diffuse: [f32; 3],
+	pub specular: [f32; 3],
+	pub illum: u32,
 }
 
 named!(comment, preceded!(tag!("#"), take_until_and_consume!("\n")));
 
-named!(parse_vector3<&[u8], Vector3<f32>>,
+named!(parse_vector3<&[u8], [f32; 3]>,
 	do_parse!(
 		x: parse_float >>
 		space >>
@@ -26,7 +26,7 @@ named!(parse_vector3<&[u8], Vector3<f32>>,
 		space >>
 		z: parse_float >>
 		line_ending >>
-		(Vector3::new(x, y, z))
+		([ x, y, z ])
 	)
 );
 

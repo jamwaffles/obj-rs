@@ -39,14 +39,37 @@ pub struct BufferVertex {
 
 // you must pass the list of members to the macro
 // implement_vertex!(Vertex, position, normal);
-implement_vertex!(BufferVertex, position);
+implement_vertex!(BufferVertex, position, color);
 
 impl WavefrontModel {
 	// pub fn to_vertices() -> (Vec<Vertex>, Vec<u32>) {
 	pub fn to_vertices(&self) -> (Vec<BufferVertex>, Vec<u32>) {
 		let object = self.objects.get(0).unwrap();
 
-		let vertices = object.vertices.iter().map(|v| BufferVertex { position: [ v.x, v.y, v.z ], color: [ 1.0, 0.0, 0.0 ] }).collect();
+		let material = match object.material {
+			Some(ref mat_name) => {
+				match self.materials {
+					Some(ref materials) => {
+						match materials.get(mat_name) {
+							Some(mat) => Some(mat),
+							None => None
+						}
+					},
+					None => None,
+				}
+			},
+			None => None
+		};
+
+		let diffuse = match material {
+			Some(mat) => mat.diffuse,
+			None => [ 0.7, 0.7, 0.7 ]
+		};
+
+		let vertices = object.vertices.iter().map(|v| BufferVertex {
+			position: [ v.x, v.y, v.z ],
+			color: diffuse,
+		}).collect();
 
 		let indices = object.faces.iter().flat_map(|f| [ f.vertices[0], f.vertices[1], f.vertices[2] ].to_vec()).collect();
 
