@@ -97,7 +97,7 @@ fn main() {
 
                 void main() {
                     v_position = position;
-                    v_normal = normal;
+                    v_normal = mat3(transpose(inverse(model_matrix))) * normal;
                     frag_pos = vec3(model_matrix * vec4(position, 1.0f));
 
                     gl_Position = persp_matrix * view_matrix * model_matrix * vec4(v_position, 1.0);
