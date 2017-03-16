@@ -26,18 +26,18 @@ use piston::window::{ WindowSettings };
 
 fn get_matrices(eye: &Point3<f32>, target: &Point3<f32>, projection: &Perspective3<f32>) -> ([[f32; 4]; 4], [[f32; 4]; 4]) {
     // No translation or rotation
-    let model = Isometry3::new(na::zero(), na::zero());
+    // let model = Isometry3::new(na::zero(), na::zero());
 
     let view   = Isometry3::look_at_rh(&eye, &target, &Vector3::z());
 
     // The combination of the model with the view is still an isometry.
-    let model_view = view * model;
+    // let model_view = view * model;
 
-    // Convert everything to a `Matrix4` so that they can be combined.
-    let mat_model_view = model_view.to_homogeneous();
+    // // Convert everything to a `Matrix4` so that they can be combined.
+    // let mat_model_view = model_view.to_homogeneous();
 
-    // Combine everything.
-    let model_view_projection = projection.as_matrix() * mat_model_view;
+    // // Combine everything.
+    // let model_view_projection = projection.as_matrix() * mat_model_view;
 
     let p = projection.as_matrix().as_slice();
     let v = view.to_homogeneous();
@@ -57,6 +57,19 @@ fn get_matrices(eye: &Point3<f32>, target: &Point3<f32>, projection: &Perspectiv
     ];
 
     (perspective_mat, view_mat)
+}
+
+fn model_matrix(translate: &Vector3<f32>, rotate: &Vector3<f32>) -> [[f32; 4]; 4] {
+    let transform = Isometry3::new(*translate, *rotate);
+
+    let t = transform.to_homogeneous();
+
+    [
+        [ t[0], t[1], t[2], t[3] ],
+        [ t[4], t[5], t[6], t[7] ],
+        [ t[8], t[9], t[10], t[11] ],
+        [ t[12], t[13], t[14], t[15] ],
+    ]
 }
 
 fn main() {
@@ -126,64 +139,54 @@ fn main() {
                 #version 330
                 uniform mat4 persp_matrix;
                 uniform mat4 view_matrix;
+                uniform mat4 model_matrix;
+
                 in vec3 position;
-                // in vec3 normal;
+                in vec3 normal;
+
                 out vec3 v_position;
-                out vec3 v_color;
-                // out vec3 v_normal;
+                // out vec3 v_color;
+                out vec3 v_normal;
+                out vec3 frag_pos;
+
                 void main() {
                     v_position = position;
-                    // v_normal = normal;
-                    gl_Position = persp_matrix * view_matrix * vec4(v_position, 1.0);
+                    v_normal = normal;
+                    frag_pos = vec3(model_matrix * vec4(position, 1.0f));
+
+                    gl_Position = persp_matrix * view_matrix * model_matrix * vec4(v_position, 1.0);
                 }
             ",
 
-            // geometry: "
-            //     #version 330
-            //     uniform mat4 matrix;
-            //     layout(triangles) in;
-            //     layout(triangle_strip, max_vertices=3) out;
-            //     out vec3 color;
-            //     float rand(vec2 co) {
-            //         return fract(sin(dot(co.xy ,vec2(12.9898,78.233))) * 43758.5453);
-            //     }
-            //     void main() {
-            //         vec3 all_color = vec3(
-            //             rand(gl_in[0].gl_Position.xy + gl_in[1].gl_Position.yz),
-            //             rand(gl_in[1].gl_Position.yx + gl_in[2].gl_Position.zx),
-            //             rand(gl_in[0].gl_Position.xz + gl_in[2].gl_Position.zy)
-            //         );
-            //         gl_Position = matrix * gl_in[0].gl_Position;
-            //         color = all_color;
-            //         EmitVertex();
-            //         gl_Position = matrix * gl_in[1].gl_Position;
-            //         color = all_color;
-            //         EmitVertex();
-            //         gl_Position = matrix * gl_in[2].gl_Position;
-            //         color = all_color;
-            //         EmitVertex();
-            //     }
-            // ",
-
             fragment: "
                 #version 330
-                // in vec3 v_normal;
+                in vec3 v_normal;
                 in vec3 v_color;
+                in vec3 frag_pos;
 
                 uniform vec3 mat_ambient;
                 uniform vec3 mat_diffuse;
 
                 out vec4 f_color;
 
-                const vec3 LIGHT = vec3(-3.0, 3.0, 4.0);
+                const vec3 LIGHT_POS = vec3(-3.0, 3.0, 4.0);
                 const vec3 LIGHT_COLOR = vec3(1.0, 1.0, 1.0);
 
                 void main() {
                     float ambientStrength = 0.1f;
                     vec3 ambient = ambientStrength * LIGHT_COLOR;
 
-                    vec3 result = ambient * mat_ambient;
+                    vec3 norm = normalize(v_normal);
+                    vec3 lightDir = normalize(LIGHT_POS - frag_pos);
+
+                    float diff = max(dot(norm, lightDir), 0.0);
+                    vec3 diffuse = diff * LIGHT_COLOR;
+
+                    vec3 result = (ambient + diffuse) * mat_diffuse;
                     f_color = vec4(result, 1.0f);
+
+                    // vec3 result = ambient * mat_ambient;
+                    // f_color = vec4(result, 1.0f);
 
                     // f_color = vec4(mat_diffuse, 1.0);
                 }
@@ -216,6 +219,7 @@ fn main() {
                 let uniforms = uniform! {
                     persp_matrix: perspective_mat,
                     view_matrix: view_mat,
+                    model_matrix: model_matrix(&Vector3::new(0.0, 0.0, 0.0), &Vector3::new(0.0, 0.0, 0.0)),
 
                     mat_ambient: material.ambient,
                     mat_diffuse: material.diffuse,
