@@ -32,7 +32,7 @@ pub struct WavefrontModel {
 }
 
 #[derive(Copy, Clone)]
-struct BufferVertex {
+pub struct BufferVertex {
     position: [ f32; 3 ],
     color: [ f32; 3 ],
 }
