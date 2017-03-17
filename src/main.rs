@@ -12,7 +12,7 @@ extern crate glutin_window;
 mod wavefront;
 mod glium_window;
 
-use wavefront::obj;
+use wavefront::{ obj, mtl };
 use glium_window::GliumWindow;
 
 use glium::{ Surface };
@@ -62,7 +62,7 @@ fn model_matrix(translate: &Vector3<f32>, rotate: &Vector3<f32>) -> [[f32; 4]; 4
 fn main() {
     let model = obj::load("./assets/cube.obj");
 
-    let (vertices, material) = model.unwrap().to_vertices();
+    let objects = model.unwrap().to_vertices();
 
     // building the display, ie. the main object
     let mut display: GliumWindow = WindowSettings::new("Test", [1280, 720])
@@ -73,7 +73,12 @@ fn main() {
         .build()
         .unwrap();
 
-    let vertex_buffer = glium::VertexBuffer::new(&display, &vertices.as_slice()).unwrap();
+    let buffers: Vec<(glium::VertexBuffer<obj::BufferVertex>, mtl::WavefrontMaterial)> = objects.iter().map(|&(ref vertices, ref material)| {
+        (
+            glium::VertexBuffer::new(&display, &vertices.as_slice()).unwrap(),
+            (*material).clone()
+        )
+    }).collect();
 
     // A perspective projection.
     let perspective = Perspective3::new(16.0f32 / 9.0, 3.14 / 2.0, 0.1, 1000.0);
@@ -140,7 +145,7 @@ fn main() {
             write: true,
             .. Default::default()
         },
-        backface_culling: BackfaceCullingMode::CullClockwise,
+        backface_culling: BackfaceCullingMode::CullingDisabled,
         .. Default::default()
     };
 
@@ -155,20 +160,23 @@ fn main() {
 
                 let (perspective_mat, view_mat) = get_matrices(&eye, &target, &perspective);
 
-                // building the uniforms
-                let uniforms = uniform! {
-                    persp_matrix: perspective_mat,
-                    view_matrix: view_mat,
-                    model_matrix: model_matrix(&Vector3::new(0.0, 0.0, 0.0), &Vector3::new(0.0, 0.0, angle)),
-
-                    mat_ambient: material.ambient,
-                    mat_diffuse: material.diffuse,
-                };
-
-                // drawing a frame
                 let mut target = display.draw();
                 target.clear_color_and_depth((0.0, 0.0, 0.0, 0.0), 1.0);
-                target.draw(&vertex_buffer, NoIndices(PrimitiveType::TrianglesList), &program, &uniforms, &params).unwrap();
+
+                for &(ref buffer, ref material) in buffers.iter() {
+                    // building the uniforms
+                    let uniforms = uniform! {
+                        persp_matrix: perspective_mat,
+                        view_matrix: view_mat,
+                        model_matrix: model_matrix(&Vector3::new(0.0, 0.0, 0.0), &Vector3::new(0.0, 0.0, angle)),
+
+                        mat_ambient: material.ambient,
+                        mat_diffuse: material.diffuse,
+                    };
+
+                    target.draw(buffer, NoIndices(PrimitiveType::TrianglesList), &program, &uniforms, &params).unwrap();
+                }
+
                 target.finish().unwrap();
             },
             Input::Update(u) => {

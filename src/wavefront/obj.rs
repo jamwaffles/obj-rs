@@ -40,64 +40,65 @@ pub struct BufferVertex {
 implement_vertex!(BufferVertex, position, normal);
 
 impl WavefrontModel {
-	pub fn to_vertices(&self) -> (Vec<BufferVertex>, mtl::WavefrontMaterial) {
-		let object = self.objects.get(0).unwrap();
+	pub fn to_vertices(&self) -> Vec<(Vec<BufferVertex>, mtl::WavefrontMaterial)> {
+		// let object = self.objects.get(0).unwrap();
+		self.objects.iter().map(|ref object| {
+			let vertices = object.faces.iter().flat_map(|f| {
+				let v1 = object.vertices.get(f.vertices[0] as usize).unwrap();
+				let v2 = object.vertices.get(f.vertices[1] as usize).unwrap();
+				let v3 = object.vertices.get(f.vertices[2] as usize).unwrap();
 
-		let vertices = object.faces.iter().flat_map(|f| {
-			let v1 = object.vertices.get(f.vertices[0] as usize).unwrap();
-			let v2 = object.vertices.get(f.vertices[1] as usize).unwrap();
-			let v3 = object.vertices.get(f.vertices[2] as usize).unwrap();
+				let vn1 = object.normals.get(f.normals[0] as usize).unwrap();
+				let vn2 = object.normals.get(f.normals[1] as usize).unwrap();
+				let vn3 = object.normals.get(f.normals[2] as usize).unwrap();
 
-			let vn1 = object.normals.get(f.normals[0] as usize).unwrap();
-			let vn2 = object.normals.get(f.normals[1] as usize).unwrap();
-			let vn3 = object.normals.get(f.normals[2] as usize).unwrap();
+				vec![
+					BufferVertex {
+						position: [ v1.x, v1.y, v1.z ],
+						normal: [ vn1.x, vn1.y, vn1.z ],
+						// color: diffuse,
+					},
 
-			vec![
-				BufferVertex {
-					position: [ v1.x, v1.y, v1.z ],
-					normal: [ vn1.x, vn1.y, vn1.z ],
-					// color: diffuse,
-				},
+					BufferVertex {
+						position: [ v2.x, v2.y, v2.z ],
+						normal: [ vn2.x, vn2.y, vn2.z ],
+						// color: diffuse,
+					},
 
-				BufferVertex {
-					position: [ v2.x, v2.y, v2.z ],
-					normal: [ vn2.x, vn2.y, vn2.z ],
-					// color: diffuse,
-				},
+					BufferVertex {
+						position: [ v3.x, v3.y, v3.z ],
+						normal: [ vn3.x, vn3.y, vn3.z ],
+						// color: diffuse,
+					},
+				]
+			}).collect();
 
-				BufferVertex {
-					position: [ v3.x, v3.y, v3.z ],
-					normal: [ vn3.x, vn3.y, vn3.z ],
-					// color: diffuse,
-				},
-			]
-		}).collect();
-
-		let material = match &self.materials {
-			&Some(ref materials) => {
-				match &materials.get("Material") {
-					&Some(ref mat) => (*mat).clone(),
-					&None => mtl::WavefrontMaterial {
-						name: String::from("Default material"),
-						specular_exponent: 1.0,
-						ambient: [0.1, 0.7, 0.7],
-						diffuse: [0.1, 0.7, 0.7],
-						specular: [0.7, 0.7, 0.7],
-						illum: 10,
+			let material = match &self.materials {
+				&Some(ref materials) => {
+					match &materials.get("Material") {
+						&Some(ref mat) => (*mat).clone(),
+						&None => mtl::WavefrontMaterial {
+							name: String::from("Default material"),
+							specular_exponent: 1.0,
+							ambient: [0.1, 0.7, 0.7],
+							diffuse: [0.1, 0.7, 0.7],
+							specular: [0.7, 0.7, 0.7],
+							illum: 10,
+						}
 					}
+				},
+				&None => mtl::WavefrontMaterial {
+					name: String::from("Default material"),
+					specular_exponent: 1.0,
+					ambient: [0.1, 0.7, 0.7],
+					diffuse: [0.1, 0.7, 0.7],
+					specular: [0.7, 0.7, 0.7],
+					illum: 10,
 				}
-			},
-			&None => mtl::WavefrontMaterial {
-				name: String::from("Default material"),
-				specular_exponent: 1.0,
-				ambient: [0.1, 0.7, 0.7],
-				diffuse: [0.1, 0.7, 0.7],
-				specular: [0.7, 0.7, 0.7],
-				illum: 10,
-			}
-		};
+			};
 
-		(vertices, material)
+			(vertices, material)
+		}).collect()
 	}
 }
 
