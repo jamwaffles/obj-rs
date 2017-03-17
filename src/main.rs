@@ -19,7 +19,6 @@ use glium::{ Surface };
 use glium::index::{ PrimitiveType, NoIndices };
 use glium::draw_parameters::BackfaceCullingMode;
 use nalgebra::{ Point3, Vector3, Perspective3, Isometry3 };
-use nalgebra as na;
 use piston_window::{ Input, OpenGL };
 use piston::event_loop::{ Events, EventSettings, EventLoop };
 use piston::window::{ WindowSettings };

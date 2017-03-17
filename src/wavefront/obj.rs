@@ -43,33 +43,6 @@ impl WavefrontModel {
 	pub fn to_vertices(&self) -> (Vec<BufferVertex>, mtl::WavefrontMaterial) {
 		let object = self.objects.get(0).unwrap();
 
-		let material = match object.material {
-			Some(ref mat_name) => {
-				match self.materials {
-					Some(ref materials) => {
-						match materials.get(mat_name) {
-							Some(mat) => Some(mat),
-							None => None
-						}
-					},
-					None => None,
-				}
-			},
-			None => None
-		};
-
-		// let thingy = match material {
-		// 	Some(ref mat) => *mat.clone(),
-		// 	None => mtl::WavefrontMaterial {
-		// 		name: String::from("Default material"),
-		// 		specular_exponent: 1.0,
-		// 		ambient: [0.7, 0.7, 0.7],
-		// 		diffuse: [0.7, 0.7, 0.7],
-		// 		specular: [0.7, 0.7, 0.7],
-		// 		illum: 10,
-		// 	}
-		// };
-
 		let vertices = object.faces.iter().flat_map(|f| {
 			let v1 = object.vertices.get(f.vertices[0] as usize).unwrap();
 			let v2 = object.vertices.get(f.vertices[1] as usize).unwrap();
@@ -100,14 +73,31 @@ impl WavefrontModel {
 			]
 		}).collect();
 
-		(vertices, mtl::WavefrontMaterial {
+		let material = match &self.materials {
+			&Some(ref materials) => {
+				match &materials.get("Material") {
+					&Some(ref mat) => (*mat).clone(),
+					&None => mtl::WavefrontMaterial {
+						name: String::from("Default material"),
+						specular_exponent: 1.0,
+						ambient: [0.1, 0.7, 0.7],
+						diffuse: [0.1, 0.7, 0.7],
+						specular: [0.7, 0.7, 0.7],
+						illum: 10,
+					}
+				}
+			},
+			&None => mtl::WavefrontMaterial {
 				name: String::from("Default material"),
 				specular_exponent: 1.0,
 				ambient: [0.1, 0.7, 0.7],
 				diffuse: [0.1, 0.7, 0.7],
 				specular: [0.7, 0.7, 0.7],
 				illum: 10,
-			})
+			}
+		};
+
+		(vertices, material)
 	}
 }
 

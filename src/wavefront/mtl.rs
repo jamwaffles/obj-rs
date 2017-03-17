@@ -5,7 +5,7 @@ use std::collections::HashMap;
 
 pub type WavefrontMaterials = HashMap<String, WavefrontMaterial>;
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct WavefrontMaterial {
 	pub name: String,
 	pub specular_exponent: f32,
