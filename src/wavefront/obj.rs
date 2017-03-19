@@ -1,5 +1,4 @@
 use nom::{ space, digit, line_ending, IResult, not_line_ending };
-use nalgebra::{ Vector3 };
 use std::str;
 use std::fs::File;
 use std::io::prelude::*;
@@ -8,30 +7,38 @@ use std::error::Error;
 
 use super::mtl;
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 struct Face {
 	vertices: [u32; 3],
 	normals: [u32; 3],
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 struct WavefrontObject {
 	name: String,
-	vertices: Vec<Vector3<f32>>,
-	normals: Vec<Vector3<f32>>,
-	texcoords: Option<Vec<Vector3<f32>>>,
-	material: Option<String>,
+	material_name: Option<String>,
 	smoothing: Option<bool>,
 	faces: Vec<Face>,
+}
+
+#[derive(Debug)]
+pub struct WavefrontModelData {
+	objects: Vec<WavefrontObject>,
+	vertices: Vec<[f32; 3]>,
+	normals: Vec<[f32; 3]>,
+	texcoords: Vec<[f32; 3]>,
 }
 
 #[derive(Debug)]
 pub struct WavefrontModel {
 	materials: Option<mtl::WavefrontMaterials>,
 	objects: Vec<WavefrontObject>,
+	vertices: Vec<[f32; 3]>,
+	normals: Vec<[f32; 3]>,
+	texcoords: Vec<[f32; 3]>,
 }
 
-#[derive(Copy, Clone)]
+#[derive(Copy, Clone, Debug)]
 pub struct BufferVertex {
     position: [ f32; 3 ],
 	normal: [ f32; 3 ],
@@ -41,59 +48,47 @@ implement_vertex!(BufferVertex, position, normal);
 
 impl WavefrontModel {
 	pub fn to_vertices(&self) -> Vec<(Vec<BufferVertex>, mtl::WavefrontMaterial)> {
-		// let object = self.objects.get(0).unwrap();
 		self.objects.iter().map(|ref object| {
 			let vertices = object.faces.iter().flat_map(|f| {
-				let v1 = object.vertices.get(f.vertices[0] as usize).unwrap();
-				let v2 = object.vertices.get(f.vertices[1] as usize).unwrap();
-				let v3 = object.vertices.get(f.vertices[2] as usize).unwrap();
+				let v1 = self.vertices.get(f.vertices[0] as usize).expect(&format!("Could not get v1 {}", f.vertices[0]));
+				let v2 = self.vertices.get(f.vertices[1] as usize).expect(&format!("Could not get v2 {}", f.vertices[1]));
+				let v3 = self.vertices.get(f.vertices[2] as usize).expect(&format!("Could not get v3 {}", f.vertices[2]));
 
-				let vn1 = object.normals.get(f.normals[0] as usize).unwrap();
-				let vn2 = object.normals.get(f.normals[1] as usize).unwrap();
-				let vn3 = object.normals.get(f.normals[2] as usize).unwrap();
+				let vn1 = self.normals.get(f.normals[0] as usize).expect(&format!("Could not get vn1 {}", f.normals[0]));
+				let vn2 = self.normals.get(f.normals[1] as usize).expect(&format!("Could not get vn2 {}", f.normals[1]));
+				let vn3 = self.normals.get(f.normals[2] as usize).expect(&format!("Could not get vn3 {}", f.normals[2]));
 
 				vec![
-					BufferVertex {
-						position: [ v1.x, v1.y, v1.z ],
-						normal: [ vn1.x, vn1.y, vn1.z ],
-						// color: diffuse,
-					},
-
-					BufferVertex {
-						position: [ v2.x, v2.y, v2.z ],
-						normal: [ vn2.x, vn2.y, vn2.z ],
-						// color: diffuse,
-					},
-
-					BufferVertex {
-						position: [ v3.x, v3.y, v3.z ],
-						normal: [ vn3.x, vn3.y, vn3.z ],
-						// color: diffuse,
-					},
+					BufferVertex { position: *v1, normal: *vn1 },
+					BufferVertex { position: *v2, normal: *vn2 },
+					BufferVertex { position: *v3, normal: *vn3 },
 				]
 			}).collect();
 
+			let mat = match object.material_name {
+				Some(ref mat) => (*mat).clone(),
+				None => String::from("Material")
+			};
+
 			let material = match &self.materials {
 				&Some(ref materials) => {
-					match &materials.get("Material") {
+					match &materials.get(&mat) {
 						&Some(ref mat) => (*mat).clone(),
 						&None => mtl::WavefrontMaterial {
 							name: String::from("Default material"),
 							specular_exponent: 1.0,
-							ambient: [0.1, 0.7, 0.7],
-							diffuse: [0.1, 0.7, 0.7],
+							ambient: [1.0, 0.0, 0.0],
+							diffuse: [1.0, 0.0, 0.0],
 							specular: [0.7, 0.7, 0.7],
-							illum: 10,
 						}
 					}
 				},
 				&None => mtl::WavefrontMaterial {
 					name: String::from("Default material"),
 					specular_exponent: 1.0,
-					ambient: [0.1, 0.7, 0.7],
-					diffuse: [0.1, 0.7, 0.7],
+					ambient: [1.0, 0.0, 0.0],
+					diffuse: [1.0, 0.0, 0.0],
 					specular: [0.7, 0.7, 0.7],
-					illum: 10,
 				}
 			};
 
@@ -137,7 +132,7 @@ named!(parse_face_index<u32>,
 	do_parse!(num: digit >> (str::from_utf8(num).unwrap().parse::<u32>().unwrap() - 1))
 );
 
-named!(parse_vector3<&[u8], Vector3<f32>>,
+named!(parse_vector3<&[u8], [f32; 3]>,
 	do_parse!(
 		x: parse_float >>
 		space >>
@@ -145,13 +140,13 @@ named!(parse_vector3<&[u8], Vector3<f32>>,
 		space >>
 		z: parse_float >>
 		line_ending >>
-		(Vector3::new(x, y, z))
+		([ x, y, z ])
 	)
 );
 
-named!(vertex <&[u8], Vector3<f32>>, do_parse!(tag!("v") >> space >> vector: parse_vector3 >> (vector)));
-named!(normal <&[u8], Vector3<f32>>, do_parse!(tag!("vn") >> space >> vector: parse_vector3 >> (vector)));
-named!(texcoord<&[u8], Vector3<f32>>,
+named!(vertex <&[u8], [f32; 3]>, do_parse!(tag!("v") >> space >> vector: parse_vector3 >> (vector)));
+named!(normal <&[u8], [f32; 3]>, do_parse!(tag!("vn") >> space >> vector: parse_vector3 >> (vector)));
+named!(texcoord<&[u8], [f32; 3]>,
 	do_parse!(
 		tag!("vt") >>
 		space >>
@@ -160,7 +155,7 @@ named!(texcoord<&[u8], Vector3<f32>>,
 		v: parse_float >>
 		opt!(space) >>
 		w: opt!(parse_float) >>
-		(Vector3::new(u, v, w.unwrap_or(0.0)))
+		([ u, v, w.unwrap_or(0.0) ])
 	)
 );
 named!(face <&[u8], Face>,
@@ -179,13 +174,6 @@ named!(face <&[u8], Face>,
 		})
 	)
 );
-
-named!(vertices_aggregator<&[u8], Vec<Vector3<f32>>>, many1!(vertex));
-named!(normals_aggregator<&[u8], Vec<Vector3<f32>>>, many1!(normal));
-named!(texcoords_aggregator<&[u8], Vec<Vector3<f32>>>, many1!(texcoord));
-named!(faces_aggregator<&[u8], Vec<Face>>, many0!(face));
-
-named!(comment, preceded!(tag!("#"), take_until_and_consume!("\n")));
 
 named!(mtllib<&[u8], String>,
 	do_parse!(
@@ -230,42 +218,73 @@ named!(object_start<&[u8], String>,
 	)
 );
 
-named!(vertex_group<&[u8], WavefrontObject>,
-	do_parse!(
-		name: object_start >>
-		vertices: vertices_aggregator >>
-		normals: normals_aggregator >>
-		textcoords: opt!(texcoords_aggregator) >>
-		material: opt!(usemtl) >>
-		smoothing: opt!(smoothing) >>
-		faces: faces_aggregator >>
-		(WavefrontObject {
-			name: name,
-			vertices: vertices,
-			normals: normals,
-			texcoords: textcoords,
-			material: material,
-			smoothing: smoothing,
-			faces: faces,
-		})
-	)
-);
+#[derive(Debug)]
+enum FileEntity {
+	Vertex([f32; 3]),
+	Normal([f32; 3]),
+	TexCoord([f32; 3]),
+	Face(Face),
+	Material(String),
+	Smoothing(bool),
+	Object(String),
+	MatLib(String),
+	Ignore
+}
 
-named!(obj_file<&[u8], (Vec<WavefrontObject>, Option<String>)>,
-	do_parse!(
-		many0!(comment) >>
-		mtllib: opt!(mtllib) >>
-		objects: many1!(vertex_group) >>
-		((
-			objects,
-			mtllib
-		))
-	)
-);
+named!(entity<&[u8], FileEntity>, alt!(
+	vertex => { |v| FileEntity::Vertex(v) } |
+	normal => { |n| FileEntity::Normal(n) } |
+	face => { |f| FileEntity::Face(f) } |
+	texcoord => { |t| FileEntity::TexCoord(t) } |
+	usemtl => { |m| FileEntity::Material(m) } |
+	smoothing => { |s| FileEntity::Smoothing(s) } |
+	mtllib => { |m| FileEntity::MatLib(m) } |
+	object_start => { |o| FileEntity::Object(String::from(o)) } |
 
-fn parse(input: &[u8]) -> Result<(Vec<WavefrontObject>, Option<String>), String> {
-	match obj_file(input) {
-		IResult::Done(_, object) => Ok(object),
+	take_until_and_consume!("\n") => { |_| FileEntity::Ignore }
+));
+
+named!(file<&[u8], Vec<FileEntity>>, many1!(entity));
+
+fn parse(input: &[u8]) -> Result<(WavefrontModelData, Option<String>), String> {
+
+
+	match file(input) {
+		IResult::Done(_, lines) => {
+			let mut vertices = Vec::new();
+			let mut normals = Vec::new();
+			let mut texcoords = Vec::new();
+			let mut objects = Vec::new();
+			let mut mtl_lib: Option<String> = None;
+
+			for line in lines.into_iter() {
+				match line {
+					FileEntity::Vertex(ref v) => vertices.push(*v),
+					FileEntity::Normal(ref n) => normals.push(*n),
+					FileEntity::TexCoord(ref t) => texcoords.push(*t),
+					FileEntity::Object(ref o) => {
+						objects.push(WavefrontObject {
+							name: (*o).clone(),
+							material_name: None,
+							smoothing: None,
+							faces: Vec::new(),
+						})
+					},
+					FileEntity::MatLib(ref m_filename) => mtl_lib = Some((*m_filename).clone()),
+					FileEntity::Face(ref f) => { objects.last_mut().unwrap().faces.push((*f).clone()) },
+					FileEntity::Material(ref m) => { objects.last_mut().	unwrap().material_name = Some((*m).clone()) },
+					FileEntity::Smoothing(ref s) => { objects.last_mut().unwrap().smoothing = Some(*s) },
+					FileEntity::Ignore => (),
+				}
+			}
+
+			Ok((WavefrontModelData {
+				vertices: vertices,
+				normals: normals,
+				texcoords: texcoords,
+				objects: objects,
+			}, mtl_lib))
+		},
 		IResult::Incomplete(need) => {
 			Err(format!("Incomplete, {:?}", need))
 		},
@@ -291,7 +310,7 @@ pub fn load(pathname: &str) -> Result<WavefrontModel, String> {
         Ok(_) => ()
     }
 
-	let (objects, mtllib) = parse(&s.as_bytes()).unwrap();
+	let (model, mtllib) = parse(&s.as_bytes()).unwrap();
 
 	let materials = match mtllib {
 		Some(mtl_filename) => {
@@ -316,7 +335,10 @@ pub fn load(pathname: &str) -> Result<WavefrontModel, String> {
 	};
 
 	Ok(WavefrontModel {
-		objects: objects,
 		materials: materials,
+		vertices: model.vertices,
+		normals: model.normals,
+		texcoords: model.texcoords,
+		objects: model.objects,
 	})
 }

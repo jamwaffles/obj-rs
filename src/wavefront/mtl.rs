@@ -1,4 +1,4 @@
-use nom::{ space, digit, line_ending, IResult, not_line_ending, multispace };
+use nom::{ space, digit, line_ending, IResult, not_line_ending };
 use nom;
 use std::str;
 use std::collections::HashMap;
@@ -12,10 +12,7 @@ pub struct WavefrontMaterial {
 	pub ambient: [f32; 3],
 	pub diffuse: [f32; 3],
 	pub specular: [f32; 3],
-	pub illum: u32,
 }
-
-named!(comment, preceded!(tag!("#"), take_until_and_consume!("\n")));
 
 named!(parse_vector3<&[u8], [f32; 3]>,
 	do_parse!(
@@ -60,10 +57,6 @@ named!(parse_float<f32>,
 	)
 );
 
-named!(parse_u32<u32>,
-	do_parse!(num: digit >> (str::from_utf8(num).unwrap().parse::<u32>().unwrap()))
-);
-
 named!(material_start<&[u8], String>,
 	do_parse!(
 		tag!("newmtl") >>
@@ -74,46 +67,90 @@ named!(material_start<&[u8], String>,
 	)
 );
 
-named!(material<&[u8], WavefrontMaterial>,
-	do_parse!(
-		name: material_start >>
-		tag!("Ns") >> space >> specular_exponent: parse_float >> line_ending >>
-		tag!("Ka") >> space >> ambient: parse_vector3 >>
-		tag!("Kd") >> space >> diffuse: parse_vector3 >>
-		tag!("Ks") >> space >> specular: parse_vector3 >>
+// named!(material<&[u8], WavefrontMaterial>,
+// 	do_parse!(
+// 		name: material_start >>
+// 		tag!("Ns") >> space >> specular_exponent: parse_float >> line_ending >>
+// 		tag!("Ka") >> space >> ambient: parse_vector3 >>
+// 		tag!("Kd") >> space >> diffuse: parse_vector3 >>
+// 		tag!("Ks") >> space >> specular: parse_vector3 >>
 
-		tag!("Ke") >> not_line_ending >> line_ending >>
-		tag!("Ni") >> not_line_ending >> line_ending >>
-		tag!("d") >> not_line_ending >> line_ending >>
+// 		tag!("Ke") >> not_line_ending >> line_ending >>
+// 		tag!("Ni") >> not_line_ending >> line_ending >>
+// 		tag!("d") >> not_line_ending >> line_ending >>
 
-		tag!("illum") >> space >> illum: parse_u32 >>
-		(WavefrontMaterial {
-			name: name,
-			specular_exponent: specular_exponent,
-			ambient: ambient,
-			diffuse: diffuse,
-			specular: specular,
-			illum: illum,
-		})
-	)
-);
+// 		tag!("illum") >> space >> illum: parse_u32 >>
+// 		(WavefrontMaterial {
+// 			name: name,
+// 			specular_exponent: specular_exponent,
+// 			ambient: ambient,
+// 			diffuse: diffuse,
+// 			specular: specular,
+// 			illum: illum,
+// 		})
+// 	)
+// );
 
-named!(mtl_file<&[u8], Vec<WavefrontMaterial>>,
-	do_parse!(
-		many0!(comment) >>
-		opt!(multispace) >>
-		materials: many1!(material) >>
-		(materials)
-	)
-);
+// named!(mtl_file<&[u8], Vec<WavefrontMaterial>>,
+// 	do_parse!(
+// 		many0!(comment) >>
+// 		opt!(multispace) >>
+// 		materials: many1!(material) >>
+// 		(materials)
+// 	)
+// );
+
+#[derive(Debug)]
+enum FileEntity {
+	Name(String),
+	Ambient([f32; 3]),
+	Diffuse([f32; 3]),
+	Specular([f32; 3]),
+	Exponent(f32),
+
+	Ignore
+}
+
+named!(entity<&[u8], FileEntity>, alt!(
+	material_start => { |name| FileEntity::Name(name) } |
+	preceded!(tag!("Ns "), parse_float) => { |exp| FileEntity::Exponent(exp) } |
+	preceded!(tag!("Ka "), parse_vector3) => { |a| FileEntity::Ambient(a) } |
+	preceded!(tag!("Kd "), parse_vector3) => { |d| FileEntity::Diffuse(d) } |
+	preceded!(tag!("Ks "), parse_vector3) => { |s| FileEntity::Specular(s) } |
+
+	take_until_and_consume!("\n") => { |_| FileEntity::Ignore }
+));
+
+named!(file<&[u8], Vec<FileEntity>>, many1!(entity));
 
 pub fn parse(input: &[u8]) -> Result<WavefrontMaterials, String> {
-	match mtl_file(input) {
-		IResult::Done(_, materials) => {
+	match file(input) {
+		IResult::Done(_, lines) => {
+			let mut materials = Vec::new();
+
 			let mut map = HashMap::new();
 
-			for material in materials.into_iter() {
-				map.insert(material.name.clone(), material);
+			for line in lines.into_iter() {
+				match line {
+					FileEntity::Name(ref name) => {
+						materials.push(WavefrontMaterial {
+							name: (*name).clone(),
+							ambient: [ 0.0, 0.0, 0.0 ],
+							diffuse: [ 0.0, 0.0, 0.0 ],
+							specular: [ 0.0, 0.0, 0.0 ],
+							specular_exponent: 0.0,
+						})
+					},
+					FileEntity::Ambient(ref a) => { materials.last_mut().unwrap().ambient = *a },
+					FileEntity::Diffuse(ref d) => { materials.last_mut().unwrap().diffuse = *d },
+					FileEntity::Specular(ref s) => { materials.last_mut().unwrap().specular = *s },
+					FileEntity::Exponent(ref exp) => { materials.last_mut().unwrap().specular_exponent = *exp },
+					FileEntity::Ignore => {}
+				}
+			}
+
+			for material in materials.iter() {
+				map.insert(material.name.clone(), material.clone());
 			}
 
 			Ok(map)

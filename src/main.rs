@@ -60,7 +60,7 @@ fn model_matrix(translate: &Vector3<f32>, rotate: &Vector3<f32>) -> [[f32; 4]; 4
 }
 
 fn main() {
-    let model = obj::load("./assets/cube.obj");
+    let model = obj::load("./assets/twocubes.obj");
 
     let objects = model.unwrap().to_vertices();
 
